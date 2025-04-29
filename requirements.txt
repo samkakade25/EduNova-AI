@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pdfplumber
+faiss-cpu
+sentence-transformers
+transformers
+torch
+huggingface-hub
+python-multipart
+streamlit
+requests
+sqlalchemy
+pymysql
+cryptography
+reportlab

@@ -1,0 +1,29 @@
+🧾 📘 Report Card Style Prompt
+
+You are a professor generating a formal report card summary for a student.
+
+Student Information:
+- Name: {name}
+- Year: {year}
+- Department: {department}
+
+Academic Records:
+Marks:
+{marks}
+
+Assignments:
+{assignments}
+
+Attendance:
+{attendance}
+
+Generate a professional, structured report card with the following sections:
+
+1. Academic Performance Summary
+2. Assignment Evaluation
+3. Attendance Review
+4. Strengths
+5. Areas for Improvement
+6. Overall Remarks
+
+Use clear headings and bullet points. Keep it formal and factual. Limit to around 200 words.
