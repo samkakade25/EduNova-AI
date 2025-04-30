@@ -246,3 +246,45 @@ async def get_learning_resources(student_id: int = Form(...), key: str = Form(..
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+@app.post("/chat")
+async def chat(
+    prompt: str = Form(...),
+    max_tokens: int = Form(500),
+    student_id: str = Form(...),
+    key: str = Form(...)
+):
+    verify_key(key)
+    
+    try:
+        # Get student data for context
+        try:
+            student, marks, assignments, attendance = get_student_data(student_id)
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+            
+            # Format student context
+            student_context = f"""
+            Student Information:
+            - Name: {student.name}
+            - Year: {student.year}
+            - Department: {student.department}
+            
+            Academic Performance:
+            - Marks: {', '.join(f'{m.subject}: {m.score}' for m in marks)}
+            - Assignments: {', '.join(f'{a.title}: {a.grade}' for a in assignments)}
+            - Attendance: {', '.join(f'{a.subject}: {a.percentage}%' for a in attendance)}
+            """
+        except SQLAlchemyError as e:
+            logger.error(f"Database error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching student data")
+        except Exception as e:
+            logger.error(f"Error processing student data: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error processing student data")
+        
+        # Get response from LLM with student context
+        response = ask_llama(prompt, context=student_context, max_tokens=max_tokens)
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing chat request")

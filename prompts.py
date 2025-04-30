@@ -35,6 +35,7 @@ Feedback Analysis:
 
 Please provide a JSON response with exactly this structure:
 {{
+    "personalized_message": "A personalized message addressing the student's weak areas and career prospects",
     "articles": [
         {{
             "title": "Article Title",
@@ -51,22 +52,41 @@ Please provide a JSON response with exactly this structure:
             "description": "Brief explanation of the metric"
         }},
         // Add 4-5 more statistics
-    ]
+    ],
+    "career_advice": {{
+        "weak_areas": ["List of 2-3 specific weak areas identified"],
+        "improvement_suggestions": ["List of 2-3 specific suggestions for improvement"],
+        "job_market_insights": "Brief analysis of job market prospects",
+        "salary_expectations": "Information about salary expectations and growth"
+    }}
 }}
 
 Requirements:
-1. Articles (3-5 total):
+1. Personalized Message:
+   - Address the student by name
+   - Highlight their specific weak areas
+   - Provide encouragement and motivation
+   - Include specific improvement suggestions
+   - Mention career prospects in their field
+
+2. Articles (3-5 total):
    - Focus on topics that address the student's weak areas
    - Include beginner-friendly resources if the student is in early years
    - Include advanced topics if the student is in later years
    - Ensure URLs are valid and accessible
 
-2. Statistics (4-5 total):
+3. Statistics (4-5 total):
    - Focus on the student's specific department/field
    - Include current market trends
    - Include in-demand skills
    - Include salary information
    - Include growth projections
    - Include key challenges and opportunities
+
+4. Career Advice:
+   - List specific weak areas identified from their performance
+   - Provide concrete suggestions for improvement
+   - Include relevant job market insights
+   - Mention salary expectations and growth potential
 
 Make sure the response is valid JSON and can be parsed by json.loads().""" 
