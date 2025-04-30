@@ -5,40 +5,28 @@ GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_API_KEY = "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"   # <-- paste your key here or load from .env
 
 # Ask a question to the document context
-def ask_llama(question, context=None, max_tokens=500):
+def ask_llama(question, context):
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    if context:
-        messages = [
+    body = {
+        "model": "llama3-8b-8192",   # or any model available in your Groq account
+        "messages": [
             {"role": "system", "content": "You are a helpful AI assistant."},
             {"role": "user", "content": f"Context: {context}\n\nQuestion: {question}"}
-        ]
-    else:
-        messages = [
-            {"role": "system", "content": "You are a helpful AI assistant."},
-            {"role": "user", "content": question}
-        ]
-
-    body = {
-        "model": "llama3-8b-8192",
-        "messages": messages,
-        "temperature": 0.2,
-        "max_tokens": max_tokens
+        ],
+        "temperature": 0.2
     }
 
-    try:
-        response = requests.post(GROQ_API_URL, headers=headers, json=body)
-        response.raise_for_status()  # Raise an exception for bad status codes
+    response = requests.post(GROQ_API_URL, headers=headers, json=body)
+
+    if response.status_code == 200:
         return response.json()["choices"][0]["message"]["content"]
-    except requests.exceptions.RequestException as e:
-        print(f"Error in LLM request: {str(e)}")
-        raise Exception("Error processing LLM request")
-    except Exception as e:
-        print(f"Unexpected error: {str(e)}")
-        raise Exception("Error processing LLM request")
+    else:
+        print(f"Error: {response.status_code} - {response.text}")
+        return "Error in LLM response."
 
 # Summarize entire document
 def summarize_document(context):

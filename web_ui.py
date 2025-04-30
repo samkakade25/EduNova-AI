@@ -279,3 +279,51 @@ if st.button("Start Recording"):
 
     # You can now send `result["text"]` to your LLM or database handler
     
+
+# Chat Box Section
+st.header("💬 Direct Chat with AI")
+st.info("Ask any academic question directly to the AI. Responses will be limited to 500 tokens for clarity.")
+
+# Initialize chat history in session state if it doesn't exist
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# Display chat history
+for message in st.session_state.chat_history:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+# Chat input
+if prompt := st.chat_input("Type your question here..."):
+    # Add user message to chat history
+    st.session_state.chat_history.append({"role": "user", "content": prompt})
+    
+    # Display user message
+    with st.chat_message("user"):
+        st.write(prompt)
+    
+    try:
+        # Make API request to backend with form data
+        response = requests.post(
+            "http://localhost:8000/chat",
+            data={
+                "prompt": prompt,
+                "max_tokens": 500,
+                "key": API_KEY
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        
+        if response.status_code == 200:
+            ai_response = response.json()["response"]
+            # Add AI response to chat history
+            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
+            # Display AI response
+            with st.chat_message("assistant"):
+                st.write(ai_response)
+        else:
+            st.error(f"Error getting response from AI. Status code: {response.status_code}")
+            st.error(f"Error details: {response.text}")
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+    

@@ -250,3 +250,19 @@ async def get_learning_resources(student_id: int = Form(...), key: str = Form(..
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+@app.post("/chat")
+async def chat(
+    prompt: str = Form(...),
+    max_tokens: int = Form(500),
+    key: str = Form(...)
+):
+    verify_key(key)
+    
+    try:
+        # Get response from LLM with token limit
+        response = ask_llama(prompt, max_tokens=max_tokens)
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail="Error processing chat request")
