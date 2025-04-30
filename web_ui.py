@@ -6,9 +6,42 @@ from scipy.io.wavfile import write
 import whisper
 import os
 import pandas as pd
+from gtts import gTTS
+import tempfile
+import base64
+import random
 
 API_KEY = "mysecretkey123"  # same as backend
 
+# Function to play audio
+def autoplay_audio(audio_bytes):
+    b64 = base64.b64encode(audio_bytes).decode()
+    md = f"""
+        <audio autoplay>
+        <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+        </audio>
+        """
+    st.markdown(md, unsafe_allow_html=True)
+
+# Function to generate human-like greeting
+def generate_human_like_greeting(student_name):
+    # Different greeting styles
+    greeting_styles = [
+        f"Hey {student_name}! *pause* It's great to see you back. Let's dive into your academic journey together.",
+        f"Welcome back, {student_name}! *pause* I'm excited to explore your progress with you today.",
+        f"Hello there, {student_name}! *pause* Ready to discover your academic insights?",
+        f"Hi {student_name}! *pause* Let's take a look at how you're doing and plan your next steps."
+    ]
+    
+    # Select a random greeting style
+    greeting = random.choice(greeting_styles)
+    
+    # Add natural pauses
+    greeting = greeting.replace("*pause*", "...")
+    
+    return greeting
+
+# Add personalized greeting
 st.title("📝 EduNova AI")
 
 # PDF Document Section
@@ -56,6 +89,42 @@ if st.button("Get Student Report"):
             else:
                 # Display feedback in the UI
                 feedback_data = res.json()
+                
+                # Get student name for greeting
+                student_name = feedback_data.get('student_name', 'Student')
+                
+                # Generate human-like greeting
+                greeting_text = generate_human_like_greeting(student_name)
+                
+                # Display visual greeting
+                st.success(f"👋 {greeting_text.replace('...', '')}")
+                
+                # Generate and play voice greeting
+                try:
+                    # Create temporary file for audio
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_audio:
+                        # Generate speech with slower speed and emphasis
+                        tts = gTTS(
+                            text=greeting_text,
+                            lang='en',
+                            slow=False,
+                            tld='com'  # Use US English accent
+                        )
+                        tts.save(temp_audio.name)
+                        
+                        # Read the audio file
+                        with open(temp_audio.name, 'rb') as audio_file:
+                            audio_bytes = audio_file.read()
+                        
+                        # Play the audio
+                        autoplay_audio(audio_bytes)
+                        
+                        # Clean up
+                        os.unlink(temp_audio.name)
+                except Exception as e:
+                    st.warning("Could not play voice greeting, but you can still view your report.")
+                    st.write(str(e))
+                
                 st.write("Student ID:", feedback_data['student_id'])
                 st.write("Feedback:", feedback_data['feedback'])
                 
@@ -209,60 +278,4 @@ if st.button("Start Recording"):
     st.text_area("Transcribed Text", result["text"])
 
     # You can now send `result["text"]` to your LLM or database handler
-    
-
-# Chat Box Section
-st.header("💬 Direct Chat with AI")
-st.info("Ask any academic question directly to the AI. Responses will be limited to 500 tokens for clarity.")
-
-# Student ID input for context
-student_id = st.text_input("Enter your Student ID for personalized responses:")
-
-# Initialize chat history in session state if it doesn't exist
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-# Display chat history
-for message in st.session_state.chat_history:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
-
-# Chat input
-if prompt := st.chat_input("Type your question here..."):
-    if not student_id:
-        st.error("Please enter your Student ID first")
-        st.stop()
-    
-    # Add user message to chat history
-    st.session_state.chat_history.append({"role": "user", "content": prompt})
-    
-    # Display user message
-    with st.chat_message("user"):
-        st.write(prompt)
-    
-    try:
-        # Make API request to backend with form data
-        response = requests.post(
-            "http://localhost:8000/chat",
-            data={
-                "prompt": prompt,
-                "max_tokens": 500,
-                "student_id": student_id,
-                "key": API_KEY
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"}
-        )
-        
-        if response.status_code == 200:
-            ai_response = response.json()["response"]
-            # Add AI response to chat history
-            st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
-            # Display AI response
-            with st.chat_message("assistant"):
-                st.write(ai_response)
-        else:
-            st.error(f"Error getting response from AI. Status code: {response.status_code}")
-            st.error(f"Error details: {response.text}")
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
     

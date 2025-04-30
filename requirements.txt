@@ -13,3 +13,8 @@ sqlalchemy
 pymysql
 cryptography
 reportlab
+sounddevice
+scipy
+whisper
+pandas
+gTTS
