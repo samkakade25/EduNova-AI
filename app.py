@@ -9,7 +9,7 @@ from pdf_generator import create_student_report_pdf
 import os
 import numpy as np
 from db import get_student_data
-from prompts import STUDENT_FEEDBACK_PROMPT
+from prompts import STUDENT_FEEDBACK_PROMPT, LEARNING_RESOURCES_PROMPT
 from sqlalchemy.exc import SQLAlchemyError
 import logging
 
@@ -140,6 +140,106 @@ async def get_feedback(
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
             raise HTTPException(status_code=500, detail="Error generating response")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An unexpected error occurred")
+
+@app.post("/get_learning_resources/")
+async def get_learning_resources(student_id: int = Form(...), key: str = Form(...)):
+    try:
+        verify_key(key)
+        
+        try:
+            student, marks, assignments, attendance = get_student_data(student_id)
+        except SQLAlchemyError as e:
+            logger.error(f"Database error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Database error occurred")
+        except Exception as e:
+            logger.error(f"Error fetching student data: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching student data")
+
+        if not student:
+            raise HTTPException(status_code=404, detail="Student not found")
+
+        try:
+            # Get student feedback first
+            marks_text = "\n".join(f"{m.subject} - {m.score}" for m in marks)
+            assignments_text = "\n".join(f"{a.title} - {a.grade}" for a in assignments)
+            attendance_text = "\n".join(f"{a.subject} - {a.percentage}%" for a in attendance)
+
+            feedback_prompt = STUDENT_FEEDBACK_PROMPT.format(
+                name=student.name,
+                year=student.year,
+                department=student.department,
+                marks=marks_text or "No marks available",
+                assignments=assignments_text or "No assignments available",
+                attendance=attendance_text or "No attendance records available"
+            )
+            
+            feedback = ask_llama(feedback_prompt, "")
+            
+            # Generate learning resources
+            resources_prompt = LEARNING_RESOURCES_PROMPT.format(
+                name=student.name,
+                year=student.year,
+                department=student.department,
+                feedback=feedback
+            )
+            
+            resources = ask_llama(resources_prompt, "")
+            
+            if not resources or resources.strip() == "":
+                raise HTTPException(status_code=500, detail="Empty response from AI model")
+            
+            # Parse the JSON response
+            import json
+            try:
+                # Try to clean the response if it's not valid JSON
+                cleaned_response = resources.strip()
+                if not cleaned_response.startswith('{'):
+                    # Try to find the first '{' and last '}'
+                    start = cleaned_response.find('{')
+                    end = cleaned_response.rfind('}')
+                    if start != -1 and end != -1:
+                        cleaned_response = cleaned_response[start:end+1]
+                
+                resources_data = json.loads(cleaned_response)
+                
+                # Validate the response structure
+                if not isinstance(resources_data, dict):
+                    raise ValueError("Response is not a dictionary")
+                if 'articles' not in resources_data or 'statistics' not in resources_data:
+                    raise ValueError("Missing required fields in response")
+                if not isinstance(resources_data['articles'], list) or not isinstance(resources_data['statistics'], list):
+                    raise ValueError("Articles and statistics must be arrays")
+                
+                # Validate each article
+                for i, article in enumerate(resources_data['articles']):
+                    required_fields = ['title', 'source', 'description', 'url']
+                    if not all(field in article for field in required_fields):
+                        raise ValueError(f"Article {i} missing required fields: {required_fields}")
+                
+                # Validate each statistic
+                for i, stat in enumerate(resources_data['statistics']):
+                    required_fields = ['metric', 'value', 'description']
+                    if not all(field in stat for field in required_fields):
+                        raise ValueError(f"Statistic {i} missing required fields: {required_fields}")
+                
+                return resources_data
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse learning resources response as JSON: {str(e)}")
+                raise HTTPException(status_code=500, detail="Error processing learning resources: Invalid JSON format")
+            except ValueError as e:
+                logger.error(f"Invalid response structure: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"Error processing learning resources: {str(e)}")
+                
+        except Exception as e:
+            logger.error(f"Error generating resources: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error generating learning resources")
             
     except HTTPException:
         raise

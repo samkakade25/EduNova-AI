@@ -1,6 +1,10 @@
 import streamlit as st
 import requests
 import base64
+import sounddevice as sd
+from scipy.io.wavfile import write
+import whisper
+import os
 
 API_KEY = "mysecretkey123"  # same as backend
 
@@ -54,6 +58,43 @@ if st.button("Get Student Report"):
                 st.write("Student ID:", feedback_data['student_id'])
                 st.write("Feedback:", feedback_data['feedback'])
                 
+                # New section for personalized learning resources
+                st.header("📚 Personalized Learning Resources")
+                
+                # Get learning resources based on student's weaknesses
+                learning_res = requests.post(
+                    "http://localhost:8000/get_learning_resources/",
+                    data={
+                        "student_id": student_id,
+                        "key": API_KEY
+                    }
+                )
+                
+                if learning_res.status_code == 200:
+                    resources = learning_res.json()
+                    
+                    # Display learning resources
+                    st.subheader("Recommended Articles and Blog Posts")
+                    if 'articles' in resources and resources['articles']:
+                        for resource in resources['articles']:
+                            with st.expander(resource['title']):
+                                st.write(f"**Source:** {resource['source']}")
+                                st.write(f"**Description:** {resource['description']}")
+                                st.markdown(f"[Read More]({resource['url']})")
+                    else:
+                        st.warning("No articles available")
+                    
+                    # Display industry statistics
+                    st.subheader("Industry Statistics and Trends")
+                    if 'statistics' in resources and resources['statistics']:
+                        for stat in resources['statistics']:
+                            st.write(f"**{stat['metric']}:** {stat['value']}")
+                            st.write(f"*{stat['description']}*")
+                    else:
+                        st.warning("No statistics available")
+                else:
+                    st.warning("Could not fetch learning resources at this time.")
+                
         elif res.status_code == 404:
             st.error("Student not found. Please check the ID and try again.")
         elif res.status_code == 403:
@@ -65,3 +106,27 @@ if st.button("Get Student Report"):
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
         st.write("Please make sure the backend server is running at http://localhost:8000")
+
+# Load Whisper model
+model = whisper.load_model("base")
+
+st.title("🎙️ Ask a Question with Your Voice")
+
+# Record audio
+duration = st.slider("Recording duration (seconds)", 3, 10, 5)
+
+if st.button("Start Recording"):
+    fs = 44100
+    st.write("🎤 Recording...")
+    recording = sd.rec(int(duration * fs), samplerate=fs, channels=1)
+    sd.wait()
+    write("input.wav", fs, recording)
+    st.success("✅ Recording complete!")
+
+    # Transcribe with Whisper
+    st.write("🧠 Transcribing...")
+    result = model.transcribe("input.wav")
+    st.text_area("Transcribed Text", result["text"])
+
+    # You can now send `result["text"]` to your LLM or database handler
+    
