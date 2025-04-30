@@ -255,14 +255,48 @@ async def get_learning_resources(student_id: int = Form(...), key: str = Form(..
 async def chat(
     prompt: str = Form(...),
     max_tokens: int = Form(500),
+    student_id: int = Form(...),
     key: str = Form(...)
 ):
     verify_key(key)
     
     try:
-        # Get response from LLM with token limit
-        response = ask_llama(prompt, max_tokens=max_tokens)
-        return {"response": response}
+        # Get student data for context
+        try:
+            student, marks, assignments, attendance = get_student_data(student_id)
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+        except SQLAlchemyError as e:
+            logger.error(f"Database error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+            
+        # Format student data for context
+        try:
+            student_context = f"""
+            Student Information:
+            - Name: {student.name}
+            - Year: {student.year}
+            - Department: {student.department}
+            
+            Academic Performance:
+            - Marks: {', '.join(f'{m.subject}: {m.score}' for m in marks)}
+            - Assignments: {', '.join(f'{a.title}: {a.grade}' for a in assignments)}
+            - Attendance: {', '.join(f'{a.subject}: {a.percentage}%' for a in attendance)}
+            """
+        except Exception as e:
+            logger.error(f"Error formatting student context: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error formatting student context: {str(e)}")
+        
+        # Get response from LLM with student context
+        try:
+            response = ask_llama(prompt, context=student_context, max_tokens=max_tokens)
+            return {"response": response}
+        except Exception as e:
+            logger.error(f"LLM error: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"LLM error: {str(e)}")
+            
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error in chat endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail="Error processing chat request")
+        logger.error(f"Unexpected error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
