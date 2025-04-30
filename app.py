@@ -135,11 +135,7 @@ async def get_feedback(
                     }
                 )
             else:
-                return {
-                    "student_id": student_id,
-                    "student_name": student.name,
-                    "feedback": feedback
-                }
+                return {"student_id": student_id, "feedback": feedback}
                 
         except Exception as e:
             logger.error(f"Error generating response: {str(e)}")
@@ -255,13 +251,39 @@ async def get_learning_resources(student_id: int = Form(...), key: str = Form(..
 async def chat(
     prompt: str = Form(...),
     max_tokens: int = Form(500),
-    key: str = Form(...)
+    key: str = Form(...),
+    student_id: int = Form(...)
 ):
     verify_key(key)
     
     try:
-        # Get response from LLM with token limit
-        response = ask_llama(prompt, max_tokens=max_tokens)
+        # Get student data for context
+        try:
+            student, marks, assignments, attendance = get_student_data(student_id)
+            if not student:
+                raise HTTPException(status_code=404, detail="Student not found")
+            
+            # Format student context
+            student_context = f"""
+            Student Information:
+            - Name: {student.name}
+            - Year: {student.year}
+            - Department: {student.department}
+            
+            Academic Performance:
+            - Marks: {', '.join(f'{m.subject}: {m.score}' for m in marks)}
+            - Assignments: {', '.join(f'{a.title}: {a.grade}' for a in assignments)}
+            - Attendance: {', '.join(f'{a.subject}: {a.percentage}%' for a in attendance)}
+            """
+        except SQLAlchemyError as e:
+            logger.error(f"Database error: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error fetching student data")
+        except Exception as e:
+            logger.error(f"Error processing student data: {str(e)}")
+            raise HTTPException(status_code=500, detail="Error processing student data")
+        
+        # Get response from LLM with student context
+        response = ask_llama(prompt, context=student_context, max_tokens=max_tokens)
         return {"response": response}
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
